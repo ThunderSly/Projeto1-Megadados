@@ -1,5 +1,6 @@
 import pymysql
 
+
 def adiciona_usuario(conn, name, email, city):
     with conn.cursor() as cursor:
         try:
@@ -196,9 +197,9 @@ def lista_tagged(conn, idPost):
         passaros = tuple(x[0] for x in res)
         return passaros
 
-def adiciona_vizualizacao(conn, device, viewDate, browser, idUser, idPost):
+def adiciona_vizualizacao(conn, device, viewDate, browser, IP, idUser, idPost):
     with conn.cursor() as cursor:
-        cursor.execute('INSERT INTO Views VALUES (%s, %s, %s, %s, %s)', (device,viewDate,browser,idUser,idPost))
+        cursor.execute('INSERT INTO Views VALUES (%s, %s, %s, %s, %s, %s)', (device,viewDate, browser, IP,idUser,idPost))
 
 def remove_vizualizacao(conn, idUser, idPost):
     with conn.cursor() as cursor:
@@ -217,6 +218,64 @@ def lista_vizualizou(conn, idUser):
         res = cursor.fetchall()
         posts = tuple(x[0] for x in res)
         return posts
+
+def adiciona_curtida(conn, idPost, idUser):
+    with conn.cursor() as cursor:
+        cursor.execute('INSERT INTO Likes (idUser,idPost) VALUES (%s, %s)', (idUser, idPost))
+
+def muda_para_neg(conn, idPost, idUser):
+    with conn.cursor() as cursor:
+        cursor.execute('UPDATE Likes SET likeType = 0 WHERE idUser=%s AND idPost=%s', (idUser, idPost))
+
+def muda_para_pos(conn, idPost, idUser):
+    with conn.cursor() as cursor:
+        cursor.execute('UPDATE Likes SET likeType = 1 WHERE idUser=%s AND idPost=%s', (idUser, idPost))
+
+def remove_curtida(conn, idPost, idUser):
+    with conn.cursor() as cursor:
+        cursor.execute('DELETE FROM Likes WHERE idUser=%s AND idPost=%s',(idUser, idPost))
+
+def lista_curtiu(conn, idUser):
+    with conn.cursor() as cursor:
+        cursor.execute('SELECT idPost FROM Likes WHERE idUser=%s', (idUser))
+        res = cursor.fetchall()
+        posts = tuple(x[0] for x in res)
+        return posts
+
+def lista_curtida_por(conn, idPost):
+    with conn.cursor() as cursor:
+        cursor.execute('SELECT idUser FROM Likes WHERE idPost=%s', (idPost))
+        res = cursor.fetchall()
+        usuarios = tuple(x[0] for x in res)
+        return usuarios
+
+def lista_curtidas_ativas(conn):
+    with conn.cursor() as cursor:
+        cursor.execute('SELECT idUser, idPost from Likes WHERE activeLike = 1')
+        res = cursor.fetchall()
+        likes = tuple(x[0] for x in res)
+        return likes
+
+def lista_curtida(conn):
+    with conn.cursor() as cursor:
+        cursor.execute('SELECT idUser, idPost from Likes')
+        res = cursor.fetchall()
+        likes = tuple(x[0] for x in res)
+        return likes
+
+def lista_curtida_pos(conn):
+    with conn.cursor() as cursor:
+        cursor.execute('SELECT idUser, idPost from Likes WHERE likeType = 1')
+        res = cursor.fetchall()
+        likes = tuple(x[0] for x in res)
+        return likes
+
+def lista_curtida_neg(conn):
+    with conn.cursor() as cursor:
+        cursor.execute('SELECT idUser, idPost from Likes WHERE likeType = 0')
+        res = cursor.fetchall()
+        likes = tuple(x[0] for x in res)
+        return likes
 
 def lista_postado_pelo(conn, idUser):
     with conn.cursor() as cursor:
@@ -266,3 +325,83 @@ def lista_tag(conn):
         res = cursor.fetchall()
         tags = tuple(x[0] for x in res)
         return tags
+
+def lista_novos(conn,idUser):
+    with conn.cursor() as cursor:
+        cursor.execute('SELECT title FROM Posts INNER JOIN Users USING (idUser) WHERE idUser=%s ORDER BY idPost DESC',(idUser))
+        res = cursor.fetchall()
+        posts = tuple(x[0] for x in res)
+        return posts
+
+def lista_populares(conn):
+    with conn.cursor() as cursor:
+        cursor.execute('''
+                        CREATE TEMPORARY TABLE viewCount
+                        SELECT 
+                            idUser,
+                            fullName,
+                            city,
+                            COUNT(Views.idUser) AS num_views
+                        FROM
+                            Users
+                            INNER JOIN Posts USING (idUser)
+                            INNER JOIN Views USING (idPost)
+                        GROUP BY 
+                            idUser;
+                        ORDER BY num_views DESC
+                        ''')
+        cursor.execute('''
+                        SELECT fullName, city, num_views 
+                        FROM (
+                            SELECT fullName, city, Dense_Rank() 
+                            OVER (PARTITION BY city
+                                ORDER BY num_views DESC ) AS Rank
+                                FROM viewCount
+                            ) viewCount WHERE Rank <= 1
+                        ''')
+        res = cursor.fetchall()
+        users = tuple(x[0] for x in res)
+        cursor.execute('DROP TABLE viewCount')
+        return users
+
+def lista_referenciado_por(conn, idUser):
+    with conn.cursor() as cursor:
+        cursor.execute('SELECT Users.idUser, fullName FROM Mentions INNER JOIN Posts USING (idPost) INNER JOIN Users USING (idUser) WHERE Mentions.idUser=%s', (idUser))
+        res = cursor.fetchall()
+        users = tuple(x[0] for x in res)
+        return users
+
+def lista_url_por(conn):
+    with conn.cursor() as cursor:
+        cursor.execute('SELECT idPost, urlPhoto, birdType FROM Birds INNER JOIN Tags USING (idBird) INNER JOIN Posts USING (idPosts) WHERE urlPhoto IS NOT NULL')
+        res = cursor.fetchall()
+        posts = tuple(x[0] for x in res)
+        return posts
+
+def lista_browsers(conn):
+    with conn.cursor() as cursor:
+        cursor.execute('SELECT browser, COUNT(DISTINCT IP) FROM Views GROUP BY browser')
+        res = cursor.fetchall()
+        browsers = tuple(x[0] for x in res)
+        return browsers
+
+def lista_aparelhos(conn):
+    with conn.cursor() as cursor:
+        cursor.execute('SELECT device, COUNT(DISTINCT IP) FROM Views GROUP BY device')
+        res = cursor.fetchall()
+        devices = tuple(x[0] for x in res)
+        return devices
+
+def reativa_usuario(conn, idUser):
+    with conn.cursor() as cursor:
+        try:
+            cursor.execute('UPDATE Users SET activeUser=1 where idUser=%s', (idUser))
+        except pymysql.err.IntegrityError as e:
+            raise ValueError(f'Não posso reativar o {idUser} na tabela users')
+
+def reativa_post(conn, id):
+    with conn.cursor() as cursor:
+        try:
+            cursor.execute('UPDATE Posts SET activePost=1 where idPost=%s', (id))
+        except pymysql.err.IntegrityError as e:
+            raise ValueError(f'Não posso reativar o id {id} na tabela posts') 

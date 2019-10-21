@@ -456,7 +456,7 @@ class TestProjeto(unittest.TestCase):
         self.assertCountEqual(res, (id_Guilherme, id_Ricardo))
 
         # Testa a remoção específica de uma relação usuario-post.
-        remove_mencao(conn, id_Guilherme, posts_id[0])
+        remove_mencao(conn, posts_id[0], id_Guilherme)
 
         res = lista_menciona(conn, posts_id[0])
         self.assertCountEqual(res, (id_Ricardo,))
@@ -562,12 +562,12 @@ class TestProjeto(unittest.TestCase):
             posts_id.append(acha_post(conn, p))
 
         # Conecta posts e usuarios.
-        adiciona_vizualizacao(conn, 'IPhone 5', '2004-05-23T14:25:10', 'Chrome', id_Guilherme, posts_id[0])
-        adiciona_vizualizacao(conn, 'IPhone 5', '2004-05-23T14:25:10', 'Chrome', id_Guilherme, posts_id[1])
-        adiciona_vizualizacao(conn, 'IPhone 5', '2004-05-23T14:25:10', 'Chrome', id_Andrea, posts_id[0])
-        adiciona_vizualizacao(conn, 'IPhone 5', '2004-05-23T14:25:10', 'Chrome', id_Andrea, posts_id[1])
-        adiciona_vizualizacao(conn, 'IPhone 5', '2004-05-23T14:25:10', 'Chrome', id_Ricardo, posts_id[0])
-        adiciona_vizualizacao(conn, 'IPhone 5', '2004-05-23T14:25:10', 'Chrome', id_Isadora, posts_id[1])
+        adiciona_vizualizacao(conn, 'IPhone 5', '2004-05-23T14:25:10', 'Chrome', '192.168.0.1', id_Guilherme, posts_id[0])
+        adiciona_vizualizacao(conn, 'IPhone 5', '2004-05-23T14:25:10', 'Chrome', '192.168.0.1', id_Guilherme, posts_id[1])
+        adiciona_vizualizacao(conn, 'IPhone 5', '2004-05-23T14:25:10', 'Chrome', '192.168.0.1', id_Andrea, posts_id[0])
+        adiciona_vizualizacao(conn, 'IPhone 5', '2004-05-23T14:25:10', 'Chrome', '192.168.0.1', id_Andrea, posts_id[1])
+        adiciona_vizualizacao(conn, 'IPhone 5', '2004-05-23T14:25:10', 'Chrome', '192.168.0.1', id_Ricardo, posts_id[0])
+        adiciona_vizualizacao(conn, 'IPhone 5', '2004-05-23T14:25:10', 'Chrome', '192.168.0.1', id_Isadora, posts_id[1])
 
         res = lista_vizualizou(conn, id_Guilherme)
         self.assertCountEqual(res, (posts_id[0], posts_id[1]))
@@ -677,13 +677,14 @@ class TestProjeto(unittest.TestCase):
         res1 = lista_post_ativos(conn)
         self.assertLess(len(res1), len(lista_post(conn)))
 
-        # Testa se a desativacao de uma mencao com a desativacao de um post
-        res2 = lista_mencao_ativas(conn)
-        self.assertLess(len(res2), len(lista_mencao(conn)))
-
         # Testa se a desativacao de uma tag com a desativacao de um post
         res = lista_tag_ativas(conn)
         self.assertLess(len(res), len(lista_tag(conn)))
+
+        # # Testa se a desativacao de uma mencao com a desativacao de um post
+        res2 = lista_mencao_ativas(conn)
+        self.assertLess(len(res2), len(lista_mencao(conn)))
+
 
         # Testa se a desativacao de um usuario causa a desativacao das relações entre esse usuario e seus posts.
         desativa_usuario(conn, id_Isadora)
@@ -703,6 +704,95 @@ class TestProjeto(unittest.TestCase):
         res = lista_post_ativos(conn)
         self.assertLess(len(res), len(res1))
 
+    #################################################################################################################
+
+    #@unittest.skip('Em desenvolvimento.')
+    def test_adiciona_curtida(self):
+        conn = self.__class__.connection
+
+        # Cria alguns usuarios.
+        adiciona_usuario(conn, 'Guilherme', 'guilherme@email.com', 'Peruibe')
+        id_Guilherme = acha_usuario(conn, 'Guilherme')
+        
+        adiciona_usuario(conn, 'Ricardo', 'Ricardo@email.com', 'Peruibe')
+        id_Ricardo = acha_usuario(conn, 'Ricardo')
+        
+        adiciona_usuario(conn, 'Isadora', 'Isadora@email.com', 'Peruibe')
+        id_Isadora = acha_usuario(conn, 'Isadora')
+
+        adiciona_usuario(conn, 'Andrea', 'andrea@email.com', 'Peruibe')
+        id_Andrea = acha_usuario(conn, 'Andrea')
+
+        adiciona_usuario(conn, 'Neura', 'neura@email.com', 'Peruibe')
+        id_neura = acha_usuario(conn, 'Neura')
+
+        # Cria alguns posts.
+        posts_id = []
+        for p in ('Menino cai e se quebra.', 'Olha o que eu ganhei!', 'Ninguem segura essa figura!'):
+            adiciona_post(conn, p, 'lala lalala lala al l alalalla ala al alala la', 'https://www.imgur.com/lalala', id_neura)
+            posts_id.append(acha_post(conn, p))
+
+        # Conecta posts e usuarios.
+        adiciona_curtida(conn, posts_id[0], id_Guilherme)
+        adiciona_curtida(conn, posts_id[1], id_Guilherme)
+        adiciona_curtida(conn, posts_id[0], id_Andrea)
+        adiciona_curtida(conn, posts_id[1], id_Andrea)
+        adiciona_curtida(conn, posts_id[0], id_Ricardo)
+        adiciona_curtida(conn, posts_id[1], id_Isadora)
+
+        res = lista_curtiu(conn, id_Guilherme)
+        self.assertCountEqual(res, (posts_id[0], posts_id[1]))
+
+        res = lista_curtiu(conn, id_Andrea)
+        self.assertCountEqual(res, (posts_id[0], posts_id[1]))
+
+        res = lista_curtiu(conn, id_Ricardo)
+        self.assertCountEqual(res, (posts_id[0],))
+
+        res = lista_curtiu(conn, id_Isadora)
+        self.assertCountEqual(res, (posts_id[1],))
+
+        res = lista_curtida_por(conn, posts_id[0])
+        self.assertCountEqual(res, (id_Guilherme, id_Andrea, id_Ricardo))
+
+        res = lista_curtida_por(conn, posts_id[1])
+        self.assertCountEqual(res, (id_Guilherme, id_Andrea, id_Isadora))
+
+        muda_para_neg(conn, posts_id[0], id_Guilherme)
+        muda_para_neg(conn, posts_id[0], id_Andrea)
+        muda_para_neg(conn, posts_id[1], id_Isadora)
+
+        res = lista_curtida_neg(conn)
+        self.assertCountEqual(res, (id_Guilherme, id_Andrea, id_Isadora))
+
+        # Testa se a remoção de um post causa a remoção das relações entre esse post e seus usuarios.
+        remove_post(conn, posts_id[1])
+
+        res = lista_curtiu(conn, id_Guilherme)
+        self.assertCountEqual(res, (posts_id[0],))
+
+        res = lista_curtiu(conn, id_Andrea)
+        self.assertCountEqual(res, (posts_id[0],))
+
+        res = lista_curtiu(conn, id_Isadora)
+        self.assertFalse(res)
+
+        # Testa se a remoção de um usuario causa a remoção das relações entre esse usuario e seus posts.
+        remove_usuario(conn, id_Andrea)
+
+        res = lista_curtida_por(conn, posts_id[0])
+        self.assertCountEqual(res, (id_Guilherme, id_Ricardo))
+
+        # Testa a remoção específica de uma relação usuario-post.
+        remove_curtida(conn, id_Guilherme, posts_id[0])
+
+        res = lista_curtida_por(conn, posts_id[0])
+        self.assertCountEqual(res, (id_Ricardo,))
+
+        #Teste de prevenção de curtida dupla
+        with self.assertRaises(pymysql.InternalError):
+            adiciona_curtida(conn, posts_id[0], id_Ricardo)
+
 
 def run_sql_script(filename):
     global config
@@ -721,6 +811,7 @@ def setUpModule():
     filenames = [entry for entry in os.listdir() 
         if os.path.isfile(entry) and re.match(r'.*_\d{3}\.sql', entry)]
     for filename in filenames:
+        print(filename)
         run_sql_script(filename)
 
 def tearDownModule():
